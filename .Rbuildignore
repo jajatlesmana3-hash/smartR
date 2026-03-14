@@ -1,1 +1,9 @@
-
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.git$
+^\.gitignore$
+^README\.Rmd$
+^\.github$
+^data-raw$
+^cran-comments\.md$
+^CODE_OF_CONDUCT\.md$
