@@ -10,13 +10,13 @@
 #'
 #' @return A list with results of assumption checks, each containing logical passed/failed,
 #'         p-value, and method used.
+#' @export
 #'
 #' @examples
 #' \dontrun{
 #' data(iris)
 #' check_assumptions(iris, "Sepal.Length", "Species")
 #' }
-#' @export
 check_assumptions <- function(data, var_dependent = NULL, var_independent = NULL,
                               data_info = NULL) {
   
@@ -98,22 +98,14 @@ check_normality <- function(x, group = NULL) {
       sub_x <- x[idx]
       sub_x_clean <- stats::na.omit(sub_x)
       if (length(sub_x_clean) >= 3) {
-        # Use Shapiro-Wilk if n <= 5000, else Anderson-Darling (or heuristic)
+        # Use Shapiro-Wilk if n <= 5000
         if (length(sub_x_clean) <= 5000) {
           sw <- stats::shapiro.test(sub_x_clean)
           p <- sw$p.value
           method <- "Shapiro-Wilk"
         } else {
-          # For large samples, use Anderson-Darling from nortest if available, else rely on heuristic
-          if (requireNamespace("nortest", quietly = TRUE)) {
-            ad <- nortest::ad.test(sub_x_clean)
-            p <- ad$p.value
-            method <- "Anderson-Darling"
-          } else {
-            # Heuristic: if sample is large, small deviations from normality are common.
-            p <- 0.05  # conservative
-            method <- "Heuristic (large sample)"
-          }
+          p <- 0.05
+          method <- "Heuristic (large sample)"
         }
         passed <- p > 0.05
         all_passed <- all_passed && passed
@@ -125,7 +117,7 @@ check_normality <- function(x, group = NULL) {
     }
     return(list(
       passed = all_passed,
-      p_value = NULL,  # no single p-value for grouped
+      p_value = NULL,
       method = "Group-wise tests",
       group_results = results,
       details = "Normality assessed per group."
@@ -137,15 +129,8 @@ check_normality <- function(x, group = NULL) {
       p <- sw$p.value
       method <- "Shapiro-Wilk"
     } else {
-      if (requireNamespace("nortest", quietly = TRUE)) {
-        ad <- nortest::ad.test(x_clean)
-        p <- ad$p.value
-        method <- "Anderson-Darling"
-      } else {
-        # Heuristic: large sample -> assume central limit theorem, but warn
-        p <- 0.05
-        method <- "Heuristic (large sample, consider CLT)"
-      }
+      p <- 0.05
+      method <- "Heuristic (large sample)"
     }
     passed <- p > 0.05
     return(list(
@@ -191,51 +176,21 @@ check_homogeneity <- function(x, group) {
     ))
   }
   
-  # Choose test: Bartlett if data appear normal (but we haven't tested overall), else Levene (robust)
-  # For simplicity, we use Bartlett's test (parametric) and also provide Levene as robust alternative.
-  # We can decide later based on normality results. For now, we compute both and flag.
-  
   # Bartlett's test
   bartlett_result <- tryCatch({
     stats::bartlett.test(x ~ group)
   }, error = function(e) NULL)
   
-  # Levene's test (from car package if available, otherwise use a simple version)
-  if (requireNamespace("car", quietly = TRUE)) {
-    levene_result <- car::leveneTest(x ~ group, center = median)
-    levene_p <- levene_result$`Pr(>F)`[1]
-    levene_method <- "Levene's test (median)"
-  } else {
-    # Simple Levene-type: absolute deviations from median
-    medians <- tapply(x, group, stats::median, na.rm = TRUE)
-    abs_dev <- abs(x - medians[group])
-    lm_abs <- stats::lm(abs_dev ~ group)
-    anova_abs <- stats::anova(lm_abs)
-    levene_p <- anova_abs$`Pr(>F)`[1]
-    levene_method <- "Levene-type (absolute deviations from median)"
-  }
-  
-  # For primary recommendation, we may rely on Bartlett if normal, else Levene.
-  # But for now, return both and let the calling function decide.
-  
   bartlett_p <- if (!is.null(bartlett_result)) bartlett_result$p.value else NA
   bartlett_method <- if (!is.null(bartlett_result)) "Bartlett's test" else "Failed"
   
-  # Simple heuristic: if Bartlett p > 0.05, pass; else consider Levene.
-  # We'll return both and a suggested interpretation.
   passed_bartlett <- !is.na(bartlett_p) && bartlett_p > 0.05
-  passed_levene <- !is.na(levene_p) && levene_p > 0.05
   
   list(
-    passed = passed_bartlett,  # default to Bartlett for simplicity
+    passed = passed_bartlett,
     p_value = bartlett_p,
     method = bartlett_method,
-    alternative = list(
-      method = levene_method,
-      p_value = levene_p,
-      passed = passed_levene
-    ),
-    details = if (passed_bartlett) "Variances appear homogeneous." else "Variances may be heterogeneous (Bartlett test suggests violation). Consider using Welch's correction or non-parametric alternative."
+    details = if (passed_bartlett) "Variances appear homogeneous." else "Variances may be heterogeneous."
   )
 }
 
@@ -265,10 +220,6 @@ print.smartR_assumptions <- function(x, ...) {
     cat("Homogeneity of variance:\n")
     status <- if (isTRUE(x$homogeneity$passed)) "PASSED" else if (isFALSE(x$homogeneity$passed)) "FAILED" else "NA"
     cat("  ", status, " (p = ", round(x$homogeneity$p_value, 4), ", ", x$homogeneity$method, ")\n", sep = "")
-    if (!is.null(x$homogeneity$alternative) && !is.na(x$homogeneity$alternative$p_value)) {
-      alt_status <- if (isTRUE(x$homogeneity$alternative$passed)) "PASSED" else if (isFALSE(x$homogeneity$alternative$passed)) "FAILED" else "NA"
-      cat("  Alternative (Levene): ", alt_status, " (p = ", round(x$homogeneity$alternative$p_value, 4), ")\n", sep = "")
-    }
   }
   
   cat("------------------------\n")
