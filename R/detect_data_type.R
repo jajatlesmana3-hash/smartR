@@ -1,96 +1,82 @@
 #' Detect and classify the structure of input data
 #'
-#' This function standardizes various input formats (data.frame, tibble, matrix,
-#' vector, list) into a consistent data.frame and extracts detailed information
-#' about the dependent and independent variables.
-#'
-#' @param data Input data. Can be a data.frame, tibble, data.table, matrix,
-#'   vector, or list coercible to data.frame.
-#' @param var_dependent Character string; name of the dependent variable column.
-#'   If NULL, the function assumes one-sample analysis.
-#' @param var_independent Character string; name of the independent variable column.
-#'   Optional; if NULL, only dependent variable info is returned.
-#'
-#' @return A list with components:
-#'   \item{dependent}{List of details about the dependent variable}
-#'   \item{independent}{List of details about the independent variable (if provided)}
-#'   \item{overview}{Global information about the dataset}
+#' @param data Data input (data.frame, vector, etc.)
+#' @param var_dependent Nama, indeks, atau vektor variabel dependen
+#' @param var_independent Nama, indeks, atau vektor variabel independen (opsional)
+#' @return List informasi data
 #' @export
-#'
-#' @examples
-#' \dontrun{
-#' data(iris)
-#' detect_data_structure(iris, "Sepal.Length", "Species")
-#' }
 detect_data_structure <- function(data, var_dependent = NULL, var_independent = NULL) {
   
-  # Step 1: Standardize input to a plain data.frame
+  # Standarisasi input ke data.frame
   data_std <- standardize_input(data)
   
-  # If standardization fails, stop with a helpful error
   if (is.null(data_std)) {
-    stop(
-      "\n============================================================\n",
-      "smartR Error: Unable to process input data format.\n\n",
-      "Supported formats:\n",
-      "• data.frame, tibble, data.table\n",
-      "• matrix\n",
-      "• vector (for one-sample tests)\n",
-      "• list coercible to data.frame\n\n",
-      "Please ensure your data is in one of these formats.\n",
-      "============================================================"
-    )
+    stop("Format data tidak dikenali. Gunakan data.frame, matrix, atau vector.")
   }
   
   result <- list()
   
-  # Step 2: Process dependent variable if specified
+  # Fungsi untuk mendapatkan kolom dari berbagai tipe input
+  get_column <- function(data, var) {
+    if (is.null(var)) return(NULL)
+    
+    # Jika var adalah vektor/factor (data langsung)
+    if (is.vector(var) || is.factor(var)) {
+      return(var)
+    }
+    
+    # Jika data adalah data.frame
+    if (is.data.frame(data)) {
+      # Jika var adalah string (nama kolom)
+      if (is.character(var) && length(var) == 1) {
+        if (var %in% names(data)) {
+          return(data[[var]])
+        } else {
+          stop("Kolom '", var, "' tidak ditemukan dalam data.")
+        }
+      }
+      # Jika var adalah numerik (indeks kolom)
+      if (is.numeric(var) && length(var) == 1) {
+        if (var >= 1 && var <= ncol(data)) {
+          return(data[[var]])
+        } else {
+          stop("Indeks kolom ", var, " di luar jangkauan (1-", ncol(data), ").")
+        }
+      }
+    }
+    
+    stop("Tidak dapat mengekstrak kolom dari input yang diberikan.")
+  }
+  
+  # Proses variabel dependen
   if (!is.null(var_dependent)) {
-    if (!var_dependent %in% names(data_std)) {
-      stop(
-        "\n============================================================\n",
-        "smartR Error: Column '", var_dependent, "' not found in data.\n\n",
-        "Available columns: ", paste(names(data_std), collapse = ", "), "\n",
-        "============================================================"
-      )
-    }
-    
-    dep_var <- data_std[[var_dependent]]
+    dep <- get_column(data_std, var_dependent)
     result$dependent <- list(
-      name = var_dependent,
-      data = dep_var,
-      class = class(dep_var)[1],
-      type_info = classify_variable_type(dep_var),
-      n_unique = length(unique(stats::na.omit(dep_var))),
-      n_missing = sum(is.na(dep_var)),
-      levels = if (is.factor(dep_var)) levels(dep_var) else NULL
+      name = if (is.character(var_dependent) && length(var_dependent) == 1) var_dependent else deparse(substitute(var_dependent)),
+      data = dep,
+      class = class(dep)[1],
+      type_info = classify_variable_type(dep),
+      n_unique = length(unique(stats::na.omit(dep))),
+      n_missing = sum(is.na(dep)),
+      levels = if (is.factor(dep)) levels(dep) else NULL
     )
   }
   
-  # Step 3: Process independent variable if specified
+  # Proses variabel independen
   if (!is.null(var_independent)) {
-    if (!var_independent %in% names(data_std)) {
-      stop(
-        "\n============================================================\n",
-        "smartR Error: Column '", var_independent, "' not found in data.\n\n",
-        "Available columns: ", paste(names(data_std), collapse = ", "), "\n",
-        "============================================================"
-      )
-    }
-    
-    indep_var <- data_std[[var_independent]]
+    ind <- get_column(data_std, var_independent)
     result$independent <- list(
-      name = var_independent,
-      data = indep_var,
-      class = class(indep_var)[1],
-      type_info = classify_variable_type(indep_var),
-      n_unique = length(unique(stats::na.omit(indep_var))),
-      n_missing = sum(is.na(indep_var)),
-      levels = if (is.factor(indep_var)) levels(indep_var) else unique(indep_var)
+      name = if (is.character(var_independent) && length(var_independent) == 1) var_independent else deparse(substitute(var_independent)),
+      data = ind,
+      class = class(ind)[1],
+      type_info = classify_variable_type(ind),
+      n_unique = length(unique(stats::na.omit(ind))),
+      n_missing = sum(is.na(ind)),
+      levels = if (is.factor(ind)) levels(ind) else unique(ind)
     )
   }
   
-  # Step 4: Global overview
+  # Overview data
   result$overview <- list(
     nrow = nrow(data_std),
     ncol = ncol(data_std),
@@ -98,166 +84,90 @@ detect_data_structure <- function(data, var_dependent = NULL, var_independent = 
     missing_cases = sum(!stats::complete.cases(data_std))
   )
   
-  # Add a class for potential S3 methods
   class(result) <- "smartR_data_detection"
-  
   return(result)
 }
 
-#' Standardize various R objects to a plain data.frame
-#'
-#' @param x An R object.
-#' @return A data.frame or NULL if conversion is not possible.
+#' Standardisasi berbagai input ke data.frame
+#' @param x Input
+#' @return data.frame atau NULL
 #' @keywords internal
 standardize_input <- function(x) {
-  
-  # Already a data.frame? Convert to plain data.frame (removes tibble/data.table attributes)
-  if (is.data.frame(x)) {
-    return(as.data.frame(x))
-  }
-  
-  # Matrix
-  if (is.matrix(x)) {
-    return(as.data.frame(x))
-  }
-  
-  # Vector or factor (single variable)
-  if (is.vector(x) || is.factor(x)) {
-    return(data.frame(value = x, stringsAsFactors = FALSE))
-  }
-  
-  # List that can be coerced to data.frame
+  if (is.data.frame(x)) return(as.data.frame(x))
+  if (is.matrix(x)) return(as.data.frame(x))
+  if (is.vector(x) || is.factor(x)) return(data.frame(value = x))
   if (is.list(x) && !is.data.frame(x)) {
-    tryCatch({
-      df <- as.data.frame(x, stringsAsFactors = FALSE)
-      if (ncol(df) > 0) return(df)
-    }, error = function(e) NULL)
-  }
-  
-  # Unsupported type
-  return(NULL)
+    tryCatch(as.data.frame(x), error = function(e) NULL)
+  } else NULL
 }
 
-#' Classify a variable into statistical types
-#'
-#' Determines whether a variable is NUMERIC (continuous) or CATEGORICAL
-#' (nominal/ordinal), with subtypes.
-#'
-#' @param x A vector.
-#' @return A list with components main_type, sub_type, and description.
+#' Klasifikasi tipe variabel
+#' @param x Vektor
+#' @return List dengan main_type, sub_type, description
 #' @keywords internal
 classify_variable_type <- function(x) {
-  
   x_clean <- stats::na.omit(x)
   if (length(x_clean) == 0) {
-    return(list(
-      main_type = "UNKNOWN",
-      sub_type = "UNKNOWN",
-      description = "All values are missing"
-    ))
+    return(list(main_type = "UNKNOWN", sub_type = "UNKNOWN", description = "All values missing"))
   }
   
-  # 1. Factor
+  # Factor
   if (is.factor(x)) {
-    if (is.ordered(x)) {
-      return(list(
-        main_type = "CATEGORICAL",
-        sub_type = "ORDINAL",
-        description = "Ordered factor"
-      ))
-    } else {
-      return(list(
-        main_type = "CATEGORICAL",
-        sub_type = "NOMINAL",
-        description = "Unordered factor"
-      ))
-    }
+    if (is.ordered(x)) return(list(main_type = "CATEGORICAL", sub_type = "ORDINAL", description = "Ordered factor"))
+    else return(list(main_type = "CATEGORICAL", sub_type = "NOMINAL", description = "Unordered factor"))
   }
   
-  # 2. Character
+  # Character
   if (is.character(x)) {
-    # Check if character actually represents numbers
     if (!any(is.na(suppressWarnings(as.numeric(x_clean))))) {
-      return(list(
-        main_type = "NUMERIC",
-        sub_type = "INTERVAL",
-        description = "Character but convertible to numeric"
-      ))
+      return(list(main_type = "NUMERIC", sub_type = "INTERVAL", description = "Character but convertible to numeric"))
     } else {
       n_unique <- length(unique(x_clean))
       if (n_unique <= 10) {
-        return(list(
-          main_type = "CATEGORICAL",
-          sub_type = "NOMINAL",
-          description = paste0("Character with ", n_unique, " categories")
-        ))
+        return(list(main_type = "CATEGORICAL", sub_type = "NOMINAL", description = paste0("Character with ", n_unique, " categories")))
       } else {
         warning("Character variable with >10 unique values. Treating as categorical, but verify your data.")
-        return(list(
-          main_type = "CATEGORICAL",
-          sub_type = "NOMINAL",
-          description = "Character with many unique values (possibly text?)"
-        ))
+        return(list(main_type = "CATEGORICAL", sub_type = "NOMINAL", description = "Character with many unique values"))
       }
     }
   }
   
-  # 3. Numeric (integer or double)
+  # Numeric
   if (is.numeric(x)) {
     n_unique <- length(unique(x_clean))
-    # If only a few distinct values, it might be a disguised categorical variable
     if (n_unique <= 5) {
-      return(list(
-        main_type = "CATEGORICAL",
-        sub_type = "NOMINAL",
-        description = paste0("Numeric with only ", n_unique, " distinct values (could be categorical)")
-      ))
+      return(list(main_type = "CATEGORICAL", sub_type = "NOMINAL", description = paste0("Numeric with only ", n_unique, " distinct values (categorical?)")))
     } else {
-      return(list(
-        main_type = "NUMERIC",
-        sub_type = "INTERVAL",
-        description = "Continuous numeric"
-      ))
+      return(list(main_type = "NUMERIC", sub_type = "INTERVAL", description = "Continuous numeric"))
     }
   }
   
-  # 4. Logical
+  # Logical
   if (is.logical(x)) {
-    return(list(
-      main_type = "CATEGORICAL",
-      sub_type = "NOMINAL",
-      description = "Logical (TRUE/FALSE)"
-    ))
+    return(list(main_type = "CATEGORICAL", sub_type = "NOMINAL", description = "Logical (TRUE/FALSE)"))
   }
   
-  # 5. Fallback
-  return(list(
-    main_type = "UNKNOWN",
-    sub_type = "UNKNOWN",
-    description = paste("Class:", paste(class(x), collapse = ", "))
-  ))
+  list(main_type = "UNKNOWN", sub_type = "UNKNOWN", description = paste("Class:", paste(class(x), collapse = ", ")))
 }
 
-#' Print method for smartR_data_detection objects
-#' @param x An object of class smartR_data_detection.
-#' @param ... Additional arguments.
+#' Print method
 #' @export
 print.smartR_data_detection <- function(x, ...) {
-  cat("\n--- smartR Data Detection ---\n")
+  cat("\nsmartR Data Detection\n")
   if (!is.null(x$dependent)) {
-    cat("Dependent variable:\n")
+    cat("Dependent:\n")
     cat("  Name: ", x$dependent$name, "\n")
-    cat("  Type: ", x$dependent$type_info$main_type, " (", x$dependent$type_info$sub_type, ")\n", sep="")
-    cat("  Unique values: ", x$dependent$n_unique, "\n")
+    cat("  Type: ", x$dependent$type_info$main_type, " (", x$dependent$type_info$sub_type, ")\n", sep = "")
+    cat("  Unique: ", x$dependent$n_unique, "\n")
+    cat("  Missing: ", x$dependent$n_missing, "\n")
   }
   if (!is.null(x$independent)) {
-    cat("Independent variable:\n")
+    cat("Independent:\n")
     cat("  Name: ", x$independent$name, "\n")
-    cat("  Type: ", x$independent$type_info$main_type, " (", x$independent$type_info$sub_type, ")\n", sep="")
-    cat("  Unique values: ", x$independent$n_unique, "\n")
+    cat("  Type: ", x$independent$type_info$main_type, " (", x$independent$type_info$sub_type, ")\n", sep = "")
+    cat("  Unique: ", x$independent$n_unique, "\n")
+    cat("  Missing: ", x$independent$n_missing, "\n")
   }
-  cat("Overview:\n")
-  cat("  Rows: ", x$overview$nrow, ", Complete cases: ", x$overview$complete_cases, "\n")
-  cat("------------------------\n")
-  invisible(x)
+  cat("Overview: ", x$overview$nrow, " rows, ", x$overview$ncol, " cols, ", 
+      x$overview$complete_cases, " complete cases\n")
 }
