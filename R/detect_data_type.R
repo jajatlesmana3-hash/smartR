@@ -15,13 +15,13 @@
 #'   \item{dependent}{List of details about the dependent variable}
 #'   \item{independent}{List of details about the independent variable (if provided)}
 #'   \item{overview}{Global information about the dataset}
+#' @export
 #'
 #' @examples
 #' \dontrun{
 #' data(iris)
 #' detect_data_structure(iris, "Sepal.Length", "Species")
 #' }
-#' @export
 detect_data_structure <- function(data, var_dependent = NULL, var_independent = NULL) {
   
   # Step 1: Standardize input to a plain data.frame
@@ -238,7 +238,7 @@ classify_variable_type <- function(x) {
   ))
 }
 
-#' Print method for smartR_data_detection objects (optional)
+#' Print method for smartR_data_detection objects
 #' @param x An object of class smartR_data_detection.
 #' @param ... Additional arguments.
 #' @export
@@ -258,6 +258,6 @@ print.smartR_data_detection <- function(x, ...) {
   }
   cat("Overview:\n")
   cat("  Rows: ", x$overview$nrow, ", Complete cases: ", x$overview$complete_cases, "\n")
-  cat("---\n")
+  cat("------------------------\n")
   invisible(x)
 }
