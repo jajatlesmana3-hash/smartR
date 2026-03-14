@@ -16,6 +16,7 @@
 #'
 #' @return An object of class 'smartR_recommendation' (invisibly) and prints
 #'         the recommendation to the console.
+#' @export
 #'
 #' @examples
 #' \dontrun{
@@ -23,7 +24,6 @@
 #' smart_recommend(iris, "Sepal.Length", "Species")
 #' smart_recommend(iris, "Sepal.Length", "Species", output = "full")
 #' }
-#' @export
 smart_recommend <- function(data,
                             var_dependent,
                             var_independent = NULL,
@@ -74,7 +74,7 @@ smart_recommend <- function(data,
   if (output == "compact") {
     print_compact(recommendation)
   } else {
-    print(recommendation)  # uses the S3 method defined in decision_logic.R
+    print(recommendation)
   }
   
   invisible(recommendation)
