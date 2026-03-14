@@ -5,9 +5,7 @@ export(detect_data_structure)
 export(check_assumptions)
 export(decide_method)
 export(generate_code)
-export(print.smartR_data_detection)
-export(print.smartR_assumptions)
-export(print.smartR_recommendation)
+
 
 importFrom(stats, aov)
 importFrom(stats, t.test)
