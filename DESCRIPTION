@@ -1,1 +1,19 @@
-
+Package: smartR
+Title: Intelligent Statistical Method Selection for R Users
+Version: 0.1.0
+Authors@R: 
+    person("Jajat", "L", 
+           email = "jajat@email.com",
+           role = c("aut", "cre"))
+Description: Provides automated guidance for selecting appropriate statistical methods based on data characteristics and research questions.
+License: MIT + file LICENSE
+URL: https://github.com/jajatlesmana3-hash/smartR
+BugReports: https://github.com/jajatlesmana3-hash/smartR/issues
+Depends: R (>= 3.5.0)
+Imports:
+    stats,
+    utils
+Suggests:
+    testthat
+Encoding: UTF-8
+LazyData: true
